@@ -93,6 +93,23 @@ describe("RuleEngine", () => {
                 engine.fire("trigger", state);
                 expect(state.triggered).toBeTruthy();
             });
+            it("can fire triggers in their effect", () => {
+                const rules = new RuleSet();
+                rules.addRule({
+                    id: "first",
+                    trigger: "first",
+                    effect: "fire('second')"
+                });
+                rules.addRule({
+                    id: "second",
+                    trigger: "second",
+                    effect: "state.triggered = true"
+                });
+                const state = {};
+                const engine = new RuleEngine(rules);
+                engine.fire("first", state);
+                expect(state.triggered).toBeTruthy();
+            });
         });
         describe("state-based", () => {
             it("execute when the state matches the rule condition after an event", () => {
@@ -133,7 +150,30 @@ describe("RuleEngine", () => {
                 state = engine.fire("dummy", state);
                 expect(state.triggered).toBeFalsy();
             })
+            it("can fire triggers in their effect", () => {
+                const rules = new RuleSet();
+                rules.addRule({
+                    id: "first",
+                    trigger: "first",
+                    effect: "state.first = true"
+                });
+                rules.addRule({
+                    id: "second",
+                    condition: "state.first",
+                    effect: "fire('third')"
+                });
+                rules.addRule({
+                    id: "third",
+                    trigger: "third",
+                    effect: "state.triggered = true; state.first = false"
+                });
+                const state = {};
+                const engine = new RuleEngine(rules);
+                engine.fire("first", state);
+                expect(state.triggered).toBeTruthy();
+            });
         });
+
     });
     describe("scripts", () => {
         it("uses cached scripts", () => {
