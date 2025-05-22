@@ -67,7 +67,7 @@ module.exports = class RuleEngine {
                     if (this.recursionDepth > 1) {
                         return recursionError;
                     } else {
-                        throw new Error(`Exceeded maximum recursion depth (20): ${this.triggerStack.join(" -> ")}`);
+                        throw new Error(`Exceeded maximum recursion depth (${maximumRecursionDepth}): ${this.triggerStack.join(" -> ")}`);
                     }
                 }
             }
@@ -92,8 +92,7 @@ module.exports = class RuleEngine {
 
             throw new Error(`Error executing rule '${rule.id}': ${err.message}` +
                 `\nScript: ${scriptContent}` +
-                `\nContext: ${JSON.stringify(context, null, 2)}` +
-                `\nError: ${err.stack}`);
+                `\nContext: ${JSON.stringify(context, null, 2)}`);
         }
     }
 

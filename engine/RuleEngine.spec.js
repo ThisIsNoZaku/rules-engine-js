@@ -185,8 +185,26 @@ describe("RuleEngine", () => {
                 engine.fire("first", state);
                 expect(state.triggered).toBeTruthy();
             });
-        });
+            it("throws if too many recursive triggers are called", () => {
+                const rules = new RuleSet();
 
+                rules.addRule({
+                    id: 1,
+                    trigger: 1
+                });
+
+                rules.addRule({
+                    id: 2,
+                    condition: "true",
+                    effect: "fire(1)"
+                });
+                const engine = new RuleEngine(rules);
+
+                expect(() => {
+                    engine.fire(1, {});
+                }).toThrow("Exceeded maximum recursion depth (10): " + new Array(11).fill(1).join(" -> "));
+            });
+        });
     });
     describe("scripts", () => {
         it("uses cached scripts", () => {
@@ -203,6 +221,23 @@ describe("RuleEngine", () => {
             expect(state.triggered).toBeTruthy();
             engine.fire("trigger", state);
             expect(state.triggered).toBeFalsy();
+        });
+        it("throw on error", () => {
+            const rules = new RuleSet();
+            rules.addRule({
+                id: "1",
+                trigger: "1",
+                effect: "true = helloWorld"
+            })
+            const engine = new RuleEngine(rules);
+            expect(() => {
+                engine.fire(1)
+            }).toThrow(`Error executing rule '1': Invalid left-hand side in assignment` +
+            `\nScript: true = helloWorld` +
+            `\nContext: {` +
+            `\n  "trigger": 1` +
+            `\n}`);
+
         });
     });
 });
