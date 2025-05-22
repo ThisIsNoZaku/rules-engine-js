@@ -1,5 +1,6 @@
 const vm = require('node:vm');
 const RuleSet = require("../definitions/RuleSet.js");
+const maximumRecursionDepth = 10;
 module.exports = class RuleEngine {
     constructor(ruleSet) {
         // TODO: Validate rule set- all triggers have matching triggers, etc.
@@ -8,12 +9,20 @@ module.exports = class RuleEngine {
         }
         this.ruleSet = ruleSet;
         this.scriptCache = {};
+        this.triggerStack = [];
+        this.recursionDepth = 0;
     }
 
     /**
      * Fire the given trigger using the provided context.
      */
     fire(trigger, state) {
+        this.triggerStack.push(trigger);
+        this.recursionDepth++;
+        if (this.triggerStack.length > maximumRecursionDepth) {
+            throw new TriggerRecursionError();
+        }
+
         const triggerExists = !!this.ruleSet.triggers[trigger];
         if (!triggerExists) {
             throw new Error(`Trigger '${trigger}' not found in rule set.`);
@@ -29,24 +38,42 @@ module.exports = class RuleEngine {
         // TODO: Validation of context shape.
         const rules = this.ruleSet.rulesForTrigger(trigger);
         for (let rule of rules) {
-            this.executeRule(rule, {
+            const result = this.executeRule(rule, {
                 state,
                 trigger,
                 fire: trigger => this.fire(trigger, state)
             });
+            if (result === recursionError) {
+                this.recursionDepth--;
+                if (this.recursionDepth > 1) {
+                    return recursionError;
+                } else {
+                    throw new Error(`Exceeded maximum recursion depth (${maximumRecursionDepth}): ${this.triggerStack.join(" -> ")}`);
+                }
+            }
         }
 
         const stateRules = this.findRulesForState(state);
         for (let rule of Object.values(stateRules)) {
             const willExecute = this.executeScript(rule.condition, {state, trigger});
             if (willExecute) {
-                this.executeRule(rule, {
+                const result = this.executeRule(rule, {
                     state,
                     trigger,
                     fire: trigger => this.fire(trigger, state)
                 });
+                if (result === recursionError) {
+                    this.recursionDepth--;
+                    if (this.recursionDepth > 1) {
+                        return recursionError;
+                    } else {
+                        throw new Error(`Exceeded maximum recursion depth (20): ${this.triggerStack.join(" -> ")}`);
+                    }
+                }
             }
         }
+        this.recursionDepth--;
+        this.triggerStack.pop();
         return state;
     }
 
@@ -57,8 +84,12 @@ module.exports = class RuleEngine {
     executeRule(rule, context) {
         const {effect: scriptContent} = rule;
         try {
-            this.executeScript(scriptContent, context);
+            return this.executeScript(scriptContent, context);
         } catch (err) {
+            if (err instanceof TriggerRecursionError) {
+                return recursionError;
+            }
+
             throw new Error(`Error executing rule '${rule.id}': ${err.message}` +
                 `\nScript: ${scriptContent}` +
                 `\nContext: ${JSON.stringify(context, null, 2)}` +
@@ -79,3 +110,10 @@ module.exports = class RuleEngine {
         return script.runInNewContext(sandbox);
     }
 }
+
+function TriggerRecursionError(message) {
+    this.name = "RecursionError";
+    this.message = message;
+}
+
+const recursionError = Symbol("recursionError");

@@ -75,6 +75,19 @@ describe("RuleEngine", () => {
                 engine.fire(1, {});
             }).toThrow("Cannot execute trigger '1', it's condition 'condition' was not met.");
         })
+        it("throws if too many recursive triggers are called", () => {
+            const rules = new RuleSet();
+            rules.addRule({
+                id: 1,
+                trigger: 1,
+                effect: "fire(1)"
+            });
+            const engine = new RuleEngine(rules);
+
+            expect(() => {
+                engine.fire(1, {});
+            }).toThrow("Exceeded maximum recursion depth (10): " + new Array(11).fill(1).join(" -> "));
+        });
     });
     describe("rules", () => {
         describe("event-based", () => {
