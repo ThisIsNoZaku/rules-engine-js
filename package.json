@@ -16,6 +16,9 @@
   "jest": {
     "collectCoverage": true,
     "coverageReporters": [
+      "clover",
+      "json",
+      "lcov",
       "json-summary"
     ]
   }
